@@ -1,0 +1,216 @@
+---
+title: "Business Report Assessment 3"
+author: " Muhammad Ayaz M Haque and Naga"
+date: '2022-03-31'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading all libraries 
+
+```{r}
+
+library(tidyverse)
+library(skimr)
+library(broom)
+library(forcats)
+library(randomForest)
+library(caret)
+library(rattle)
+
+
+```
+
+## Backgroud of dataset:
+The data comes from Sharla Gelfand's opendatatoronto R package, Data originally sourced from [this link](open.toronto.ca). we are going to name the dataset as shelters. 
+
+Article around Homeless Shelters in Toronto.
+
+## Data Wrangling:
+
+Initially we are going to connect the dataset and explore the dataset provided, we will be doing the following steps 
+to make our data more useful for visualization and modelling.
+
+1. Loading data
+2. Converting character variables into the factors
+3. Extracting the days, months and year from the date column
+
+
+### 1. Loading data:
+Here we are loading the data from the internet. 
+```{r}
+shelters <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-01/shelters.csv')
+
+```
+
+#### 1.a Showing the head of the head and summary of dataset:
+This shows the top rows (observations) of the dataset and also shows the summary of the dataset.
+Skim function show the nature of the variables(features) of the observation (row).
+```{r}       
+shelters %>% head()
+
+```
+
+#### 1.b Summary of dataset:
+
+The data set we have has 13 variables and 115916 observations, out of 13 variables 9 are characters, 3 are numeric and one is POSIXct
+Firstly, we will convert the few character variables into factors
+
+```{r}
+skim(shelters)
+```
+
+
+
+### 2. Coverting character variables into the factors:
+Varibles are of two types numeric and categorical, categorical are mostly the text format. to apply the regression and modelling we need to convert the text variables into the factors. in the following step we converted useful text columns into the factors. 
+```{r}
+shelters$organization_name = as.factor(shelters$organization_name)
+shelters$shelter_name = as.factor(shelters$shelter_name)
+shelters$shelter_address = as.factor(shelters$shelter_address)
+shelters$shelter_city = as.factor(shelters$shelter_city)
+shelters$sector = as.factor(shelters$sector)
+shelters$shelter_province = as.factor(shelters$shelter_province)
+shelters$shelter_postal_code = as.factor(shelters$shelter_postal_code)
+shelters$facility_name = as.factor(shelters$facility_name)
+shelters$program_name = as.factor(shelters$program_name)
+```
+
+#### 2.a Checking the structure of the dataset:
+```{r}
+str(shelters)
+```
+Here we can see all the character(text) variables have been converted into the factors
+
+### 3. Extracting the days, months and year from the date variable:
+
+In this section we are going to extract the days, months and year.
+
+
+```{r}
+shelters <- shelters %>% 
+  mutate(
+    year = format(as.Date(shelters$occupancy_date),"%Y"),
+    month = format(as.Date(shelters$occupancy_date),"%m"),
+    day = weekdays(as.Date(shelters$occupancy_date)),
+    )
+```
+
+
+-----
+
+# Data visualization:
+in this section, we have created four different visualisations. these visuals help to understand the data better with the help of bar charts. it mainly shows the distribution of repites in different cities, sectors and trend of people going getting into the shelters. below is the list of the visuals we made to explore and understand our data. We have made few questions and tried to answer them through visualisation
+
+1. How the sectors of different shelters are distribute over the cities?
+2. Which city has the most vacancy and how is it different then other cities?
+3. People are getting into shelters all our the year or is seasonal? Please show through any visualisation
+4. Does this transaction depend on any perticular day of the week? Please break your visual further into differen t yaer 
+
+### 1. How the sectors of different shelters are distributed over the cities?
+
+This is the stack column chart which shows the percentage of shelters available in different cities as per their sectors.Here we can see Etobicoke and NorthYoke has shelters only of Youth, however, Scarborough has three more sectors Women, Men and co-ed and finally Toronto has all five sectors which has Families additional 
+
+```{r}
+# distribution of shelter home as per the sectors in different cities
+
+shelters %>% 
+  ggplot(
+  aes(shelter_city, fill = sector)) +
+  geom_bar(position = "fill", alpha=0.6) +
+  theme_gray()
+```
+
+### 2. Which city has the most vacacny and how is it different then other cities?
+In this table we tried to find out the numbers of capacity, occupancy and vacancy in all the respites in all the data set. here we chose this visuals because these number is very large for Toronto compare to other cities.  
+
+```{r}
+# table shows the vacancy in different cities
+
+knitr::kable(shelters %>% 
+  group_by(shelter_city) %>% 
+  summarise(
+  total_occupancy = sum(occupancy, na.rm = TRUE),
+  total_capacity = sum(capacity, na.rm = TRUE),
+  vacancy = total_capacity - total_occupancy
+))
+```
+
+### 3. People are getting into shelters all our the year or is it seasonal? Please show through any visualisation
+Here in this graph we can see the induction in the respites is almost same all over the year, hence we can say these place should be ready all over the year without and gap in the whole year. Only in the month we can see bit of dip but it could be becasue of the less number of the days in that month. the reason of making this argument is that the other both months are almost touching the peak value.
+
+
+```{r}
+shelters %>% ggplot(
+  aes(x= month, fill=shelter_city)) +
+  geom_bar(alpha= 0.6) +
+  theme_gray()
+```
+
+### 4. Does this transaction depend on any perticular day of the week? Please break your visual further into different year?
+In the below visuals, we can see in all the years and all the days the induction of homeless into the respites is consistent. However, there have been more induction of in Men sector respites compare to othe sectors.
+
+```{r}
+shelters %>%  ggplot(
+  aes(day, fill=sector)) +
+  geom_bar(alpha=0.6) +
+  facet_wrap(~year)+
+  coord_flip()
+```
+
+
+
+## Data Modelling
+
+The data modelling is technique to see what are the factors or variables which are effecting our out variables. 
+in this case we have one dependent variable which has dependency on the other variables which can one or more. 
+
+The data set we have does not deal with any monetary transaction. this data set is used to improve the respite service provided to the homeless. 
+
+Here we are going to develop following two models.
+
+1. Linear regression models between
+ - where capacity is the outcome(dependent) on other variables (factors)
+ - where occupancy is the outcome(dependent) on other variables (factors)
+
+### Linear Regression
+
+#### Capacity as an outcome
+We have analysed our data set and found out there are missing values of capacity which need to be removed first and then run the modelling. Here we would like see if the capacity of the respite depends on the shelter name and program name or not?
+
+```{r}
+shelters_lm <- shelters %>% filter(
+  !is.na(capacity) & !is.na(shelter_postal_code))
+
+model_1 <- lm(capacity ~ shelter_name + program_name , data = shelters_lm)
+summary(model_1)
+tidy(model_1)
+
+
+```
+After running this model we can see the occupancy depends highly on the shelter_name and the program under which it has been offered. we can see the R squared value is too high and its around 90%.   
+
+#### Occupancy as an outcome:
+Here e have seen the occupancy column has no missing values, hence we do not need to filter the missing values.
+In this model we want to analyse if the occupancy of the respites depends on the shelter city and the sector it belong to
+
+
+```{r}
+model_2 <- lm(occupancy ~ shelter_city + sector, data = shelters)
+summary(model_2)
+tidy(model_2)
+
+```
+Here we can observe that the occupancy of the shelters depends on the above mentioned factors. because the R square value is not very large as previous one it shows only 0.24.These factors has impact on the outcome (occupancy) but this impact would be less than the last model
+
+
+
+
+
+
+
+
+
